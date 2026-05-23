@@ -1,4 +1,4 @@
-name: CI PR Auto Merge
+name: Auto PR and Merge
 
 on:
   push:
@@ -10,84 +10,55 @@ permissions:
   pull-requests: write
 
 jobs:
-  sync-and-test:
+  create-pr:
+    runs-on: ubuntu-latest
+
+    outputs:
+      pr_number: ${{ steps.create_pr.outputs.result }}
+
+    steps:
+      - name: Crear Pull Request
+        id: create_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            try {
+              const pr = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'PR automático action -> main',
+                head: 'action',
+                base: 'main',
+                body: 'Creado automáticamente desde GitHub Actions'
+              });
+
+              return pr.data.number;
+            } catch (error) {
+              core.info(error.message);
+            }
+
+  merge-pr:
+    needs: create-pr
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout action
-        uses: actions/checkout@v4
-        with:
-          ref: action
-          fetch-depth: 0
-
-      - name: Sync con main (evita conflictos)
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git fetch origin
-          git merge origin/main
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install pytest
-        run: pip install pytest
-
-      - name: Run tests
-        run: pytest -v
-
-      - name: Push cambios sincronizados
-        run: |
-          git push origin action
-
-  create-and-merge:
-    needs: sync-and-test
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Crear o reutilizar PR y merge
+      - name: Merge Pull Request
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const prNumber = ${{ needs.create-pr.outputs.pr_number }};
 
-            const prs = await github.rest.pulls.list({
-              owner,
-              repo,
-              head: `${owner}:action`,
-              base: "main",
-              state: "open"
+            if (!prNumber) {
+              core.setFailed("No se encontró PR para mergear");
+              return;
+            }
+
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              merge_method: 'squash'
             });
-
-            let prNumber;
-
-            if (prs.data.length > 0) {
-              prNumber = prs.data[0].number;
-            } else {
-              const pr = await github.rest.pulls.create({
-                owner,
-                repo,
-                title: "Auto PR action -> main",
-                head: "action",
-                base: "main",
-                body: "PR automático"
-              });
-
-              prNumber = pr.data.number;
-            }
-
-            // intentar merge
-            try {
-              await github.rest.pulls.merge({
-                owner,
-                repo,
-                pull_number: prNumber,
-                merge_method: "squash"
-              });
-            } catch (e) {
-              core.setFailed("No se pudo hacer merge: " + e.message);
-            }
