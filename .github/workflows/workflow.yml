@@ -69,7 +69,7 @@ jobs:
       - run: pytest -v
 
   merge-pr:
-    needs: create-pr
+    needs: tests-mr
     runs-on: ubuntu-latest
 
     steps:
