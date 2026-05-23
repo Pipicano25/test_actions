@@ -1,4 +1,4 @@
-name: Auto PR and Merge
+name: CI PR Auto Merge
 
 on:
   push:
@@ -10,30 +10,44 @@ permissions:
   pull-requests: write
 
 jobs:
-  tests:
+  sync-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout action
+        uses: actions/checkout@v4
+        with:
+          ref: action
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Sync con main (evita conflictos)
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git fetch origin
+          git merge origin/main
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: pip install pytest
+      - name: Install pytest
+        run: pip install pytest
 
-      - run: pytest -v
+      - name: Run tests
+        run: pytest -v
 
-  create-pr:
-    needs: tests
+      - name: Push cambios sincronizados
+        run: |
+          git push origin action
+
+  create-and-merge:
+    needs: sync-and-test
     runs-on: ubuntu-latest
 
-    outputs:
-      pr_number: ${{ steps.pr.outputs.pr_number }}
-
     steps:
-      - name: Buscar PR existente o crear
-        id: pr
+      - name: Crear o reutilizar PR y merge
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -41,53 +55,39 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // 1. Buscar PR existente
             const prs = await github.rest.pulls.list({
               owner,
               repo,
               head: `${owner}:action`,
-              base: 'main',
-              state: 'open'
+              base: "main",
+              state: "open"
             });
+
+            let prNumber;
 
             if (prs.data.length > 0) {
-              const pr = prs.data[0];
-              core.setOutput("pr_number", pr.number);
-              return;
+              prNumber = prs.data[0].number;
+            } else {
+              const pr = await github.rest.pulls.create({
+                owner,
+                repo,
+                title: "Auto PR action -> main",
+                head: "action",
+                base: "main",
+                body: "PR automático"
+              });
+
+              prNumber = pr.data.number;
             }
 
-            // 2. Crear PR si no existe
-            const newPr = await github.rest.pulls.create({
-              owner,
-              repo,
-              title: 'PR automático action -> main',
-              head: 'action',
-              base: 'main',
-              body: 'Creado automáticamente desde GitHub Actions'
-            });
-
-            core.setOutput("pr_number", newPr.data.number);
-
-  merge-pr:
-    needs: create-pr
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Merge PR
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const prNumber = Number("${{ needs.create-pr.outputs.pr_number }}");
-
-            if (!prNumber) {
-              core.setFailed("No PR found");
-              return;
+            // intentar merge
+            try {
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: "squash"
+              });
+            } catch (e) {
+              core.setFailed("No se pudo hacer merge: " + e.message);
             }
-
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-              merge_method: 'squash'
-            });
