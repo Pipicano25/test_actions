@@ -18,11 +18,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Crear Pull Request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr create \
-            --base main \
-            --head action \
-            --title "PR automático action -> main" \
-            --body "Creado automáticamente desde GitHub Actions"
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: action
+          title: "PR automático action -> main"
+          body: |
+            Pull Request creado automáticamente.
