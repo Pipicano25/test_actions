@@ -1,4 +1,4 @@
-name: Auto PR
+name: Auto PR and Merge
 
 on:
   push:
@@ -13,14 +13,19 @@ jobs:
   create-pr:
     runs-on: ubuntu-latest
 
+    outputs:
+      pr_number: ${{ steps.create_pr.outputs.result }}
+
     steps:
-      - name: Crear PR
+      - name: Crear Pull Request
+        id: create_pr
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
           script: |
             try {
-              await github.rest.pulls.create({
+              const pr = await github.rest.pulls.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: 'PR automático action -> main',
@@ -28,30 +33,32 @@ jobs:
                 base: 'main',
                 body: 'Creado automáticamente desde GitHub Actions'
               });
+
+              return pr.data.number;
             } catch (error) {
               core.info(error.message);
             }
 
-      - merge-pr:
-          needs: create-pr
-          runs-on: ubuntu-latest
+  merge-pr:
+    needs: create-pr
+    runs-on: ubuntu-latest
 
-          steps:
-            - name: Merge Pull Request
-              uses: actions/github-script@v7
-              with:
-                github-token: ${{ secrets.GITHUB_TOKEN }}
-                script: |
-                  const prNumber = ${{ needs.create-pr.outputs.pr_number }};
+    steps:
+      - name: Merge Pull Request
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.create-pr.outputs.pr_number }};
 
-                  if (!prNumber) {
-                    core.setFailed("No se encontró PR para mergear");
-                    return;
-                  }
+            if (!prNumber) {
+              core.setFailed("No se encontró PR para mergear");
+              return;
+            }
 
-                  await github.rest.pulls.merge({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: prNumber,
-                    merge_method: 'squash'
-                  });
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              merge_method: 'squash'
+            });
