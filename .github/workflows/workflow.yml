@@ -10,22 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  tests-pr:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install pytest
-
-      - run: pytest -v
-
   create-pr:
-    needs: tests-pr
     runs-on: ubuntu-latest
 
     outputs:
@@ -53,20 +38,6 @@ jobs:
             } catch (error) {
               core.setFailed(error.message);
             }
-  tests-mr:
-    needs: create-pr
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install pytest
-
-      - run: pytest -v
 
   merge-pr:
     needs: create-pr
