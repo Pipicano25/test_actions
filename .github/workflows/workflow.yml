@@ -25,12 +25,12 @@ jobs:
             --base main \
             --head action \
             --title "Auto merge action -> main" \
-            --body "PR creado automáticamente"
+            --body "PR creado automáticamente" || true
 
       - name: Hacer merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr merge action \
-            --merge \
+            --squash \
             --auto
