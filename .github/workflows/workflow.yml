@@ -1,4 +1,4 @@
-name: Auto PR and Merge
+name: Auto PR
 
 on:
   push:
@@ -10,41 +10,19 @@ permissions:
   pull-requests: write
 
 jobs:
-  auto-pr:
+  create-pr:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verificar PR existente
-        id: pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_NUMBER=$(gh pr list \
-            --head action \
-            --base main \
-            --json number \
-            --jq '.[0].number')
-
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-
-      - name: Crear PR
-        if: steps.pr.outputs.pr_number == ''
+      - name: Crear Pull Request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr create \
             --base main \
             --head action \
-            --title "Auto merge action -> main" \
-            --body "PR creado automáticamente"
-
-      - name: Merge automático
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr merge action \
-            --squash \
-            --auto
+            --title "PR automático action -> main" \
+            --body "Creado automáticamente desde GitHub Actions"
