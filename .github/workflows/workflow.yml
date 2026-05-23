@@ -17,7 +17,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verificar PR existente
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --head action \
+            --base main \
+            --json number \
+            --jq '.[0].number')
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
       - name: Crear PR
+        if: steps.pr.outputs.pr_number == ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -25,9 +39,9 @@ jobs:
             --base main \
             --head action \
             --title "Auto merge action -> main" \
-            --body "PR creado automáticamente" || true
+            --body "PR creado automáticamente"
 
-      - name: Hacer merge
+      - name: Merge automático
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
