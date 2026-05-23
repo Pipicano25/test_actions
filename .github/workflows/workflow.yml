@@ -10,29 +10,27 @@ permissions:
   pull-requests: write
 
 jobs:
-  create-pr:
+  auto-pr:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Crear Pull Request
-        id: cpr
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: auto-pr-action
-          base: main
-          title: "Auto PR: action -> main"
-          body: |
-            PR creado automáticamente por GitHub Actions.
-          delete-branch: true
+      - name: Crear PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head action \
+            --title "Auto merge action -> main" \
+            --body "PR creado automáticamente"
 
-      - name: Habilitar automerge
-        if: steps.cpr.outputs.pull-request-number
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge-method: squash
+      - name: Hacer merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge action \
+            --merge \
+            --auto
