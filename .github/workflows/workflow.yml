@@ -14,15 +14,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Crear Pull Request
-        uses: peter-evans/create-pull-request@v7
+      - name: Crear PR
+        uses: actions/github-script@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
-          branch: action
-          title: "PR automático action -> main"
-          body: |
-            Pull Request creado automáticamente.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'PR automático action -> main',
+                head: 'action',
+                base: 'main',
+                body: 'Creado automáticamente desde GitHub Actions'
+              });
+            } catch (error) {
+              core.info(error.message);
+            }
